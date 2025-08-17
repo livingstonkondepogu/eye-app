@@ -16,21 +16,23 @@ if uploaded_file is not None:
     # Convert to BGR for OpenCV processing
     img_cv = cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR)
 
-    # ----- Dummy Segmentation (overlay red mask on center) -----
-    mask = np.zeros_like(img_cv)
-    h, w, _ = img_cv.shape
-    cv2.circle(mask, (w//2, h//2), min(h,w)//4, (0,0,255), -1)  # red circle as abnormality
+    # ----- Dummy Segmentation (semi-transparent red overlay on edges) -----
+    gray = cv2.cvtColor(img_cv, cv2.COLOR_BGR2GRAY)
+    edges = cv2.Canny(gray, 100, 200)  # dummy edge detection
 
-    # Overlay mask on original image
-    overlay = cv2.addWeighted(img_cv, 0.7, mask, 0.3, 0)
+    mask = np.zeros_like(img_cv)
+    mask[:, :, 2] = edges  # Red channel mask
+    alpha = 0.4  # transparency
+    overlay = cv2.addWeighted(img_cv, 1, mask, alpha, 0)
 
     # Convert back to RGB for display
     overlay_rgb = cv2.cvtColor(overlay, cv2.COLOR_BGR2RGB)
 
     # Show images
     st.image(image, caption="Original Eye", use_column_width=True)
-    st.image(overlay_rgb, caption="Detected Abnormality (Dummy)", use_column_width=True)
+    st.image(overlay_rgb, caption="Detected Abnormality (Demo Overlay)", use_column_width=True)
 
     # ----- Dummy Text Result -----
     st.subheader("📋 Report")
     st.success("⚠️ Possible abnormality detected. Please consult an ophthalmologist for confirmation.")
+
