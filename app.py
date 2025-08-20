@@ -1,48 +1,48 @@
 import streamlit as st
 import numpy as np
-from PIL import Image
 from tensorflow.keras.models import load_model
+from tensorflow.keras.preprocessing import image
+from PIL import Image
 
-# Load trained model
+# Cache the model loading
 @st.cache_resource
 def load_fundus_model():
-    model = load_model("fundus_model.keras")
+    model = load_model("fundus_model.keras")  # Make sure this file is in the same repo
     return model
 
 model = load_fundus_model()
 
-# Define class labels (update if you have more than 2)
-CLASS_NAMES = ["Normal", "Abnormal"]
+# Update these with the actual classes from your training
+CLASS_NAMES = ["Normal", "Diabetic Retinopathy", "Glaucoma", "Cataract", "AMD"]
 
-st.title("👁️ Eye Disease Detection")
+st.title("👁️ Fundus Image Abnormality Detection")
+st.write("Upload a fundus image to detect abnormalities.")
 
-uploaded_file = st.file_uploader("Upload a fundus image", type=["jpg", "jpeg", "png"])
+uploaded_file = st.file_uploader("Choose a fundus image...", type=["jpg", "jpeg", "png"])
 
 if uploaded_file is not None:
-    # Show uploaded image
+    # Load and display image
     img = Image.open(uploaded_file)
     st.image(img, caption="Uploaded Image", use_column_width=True)
 
-    # Preprocess (same as training)
-    img = img.convert("RGB")       # ensure 3 channels
-    img = img.resize((225, 225))   # same size as training
-    img_array = np.array(img) / 255.0
-    img_array = np.expand_dims(img_array, axis=0)
+    # ✅ Ensure RGB (3 channels)
+    if img.mode != "RGB":
+        img = img.convert("RGB")
+
+    # ✅ Resize to match model input size (224x224, adjust if needed)
+    img = img.resize((224, 224))
+
+    # Convert to array and normalize
+    img_array = image.img_to_array(img) / 255.0
+    img_array = np.expand_dims(img_array, axis=0)  # shape (1,224,224,3)
 
     # Prediction
-    prediction = model.predict(img_array)[0]
+    preds = model.predict(img_array)
+    predicted_class = CLASS_NAMES[np.argmax(preds)]
+    confidence = np.max(preds)
 
-    # If binary classifier (1 output neuron with sigmoid)
-    if len(prediction) == 1:
-        label = "Abnormal" if prediction[0] > 0.5 else "Normal"
-        confidence = prediction[0] if label == "Abnormal" else 1 - prediction[0]
-    else:
-        # Multi-class softmax
-        label_index = np.argmax(prediction)
-        label = CLASS_NAMES[label_index]
-        confidence = prediction[label_index]
-
-    st.subheader("Prediction")
-    st.success(f"🩺 {label} (Confidence: {confidence:.2f})")
+    # Show result
+    st.subheader("🔍 Prediction Result")
+    st.write(f"**{predicted_class}** (Confidence: {confidence:.2f})")
 
 
