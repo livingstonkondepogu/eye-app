@@ -1,48 +1,80 @@
 import streamlit as st
 import numpy as np
+import cv2
 from tensorflow.keras.models import load_model
 from tensorflow.keras.preprocessing import image
-from PIL import Image
 
-# Cache the model loading
+# -----------------------------
+# Load model with safe_mode=False
+# -----------------------------
 @st.cache_resource
 def load_fundus_model():
-    model = load_model("fundus_model.keras")  # Make sure this file is in the same repo
+    try:
+        model = load_model("fundus_model.keras", safe_mode=False)
+    except Exception as e:
+        st.error(f"❌ Error loading model: {e}")
+        st.stop()
     return model
 
 model = load_fundus_model()
 
-# Update these with the actual classes from your training
-CLASS_NAMES = ["Normal", "Diabetic Retinopathy", "Glaucoma", "Cataract", "AMD"]
+# -----------------------------
+# Define class labels (edit to match your training)
+# -----------------------------
+CLASS_NAMES = [
+    "Normal",
+    "Diabetic Retinopathy",
+    "Glaucoma",
+    "Cataract",
+    "Age-related Macular Degeneration",
+    "Hypertensive Retinopathy",
+    "Other Abnormality"
+]
 
+# -----------------------------
+# Preprocess uploaded image
+# -----------------------------
+def preprocess_image(uploaded_file):
+    # Read as OpenCV image
+    file_bytes = np.asarray(bytearray(uploaded_file.read()), dtype=np.uint8)
+    img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+
+    # Resize to model input (225x225) — adjust if needed
+    img = cv2.resize(img, (225, 225))
+
+    # Normalize [0,1]
+    img = img.astype("float32") / 255.0
+
+    # Ensure shape (225, 225, 3)
+    if img.shape[-1] == 1:
+        img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
+
+    # Add batch dimension
+    img = np.expand_dims(img, axis=0)
+    return img
+
+# -----------------------------
+# Streamlit UI
+# -----------------------------
 st.title("👁️ Fundus Image Abnormality Detection")
-st.write("Upload a fundus image to detect abnormalities.")
+st.write("Upload a retinal fundus image to check for abnormalities.")
 
-uploaded_file = st.file_uploader("Choose a fundus image...", type=["jpg", "jpeg", "png"])
+uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
 
 if uploaded_file is not None:
-    # Load and display image
-    img = Image.open(uploaded_file)
-    st.image(img, caption="Uploaded Image", use_column_width=True)
+    # Show uploaded image
+    st.image(uploaded_file, caption="Uploaded Image", use_column_width=True)
 
-    # ✅ Ensure RGB (3 channels)
-    if img.mode != "RGB":
-        img = img.convert("RGB")
+    # Preprocess
+    img = preprocess_image(uploaded_file)
 
-    # ✅ Resize to match model input size (224x224, adjust if needed)
-    img = img.resize((224, 224))
-
-    # Convert to array and normalize
-    img_array = image.img_to_array(img) / 255.0
-    img_array = np.expand_dims(img_array, axis=0)  # shape (1,224,224,3)
-
-    # Prediction
-    preds = model.predict(img_array)
-    predicted_class = CLASS_NAMES[np.argmax(preds)]
+    # Predict
+    preds = model.predict(img)
+    pred_class = np.argmax(preds, axis=1)[0]
     confidence = np.max(preds)
 
-    # Show result
     st.subheader("🔍 Prediction Result")
-    st.write(f"**{predicted_class}** (Confidence: {confidence:.2f})")
+    st.write(f"**Class:** {CLASS_NAMES[pred_class]}")
+    st.write(f"**Confidence:** {confidence:.2f}")
 
 
