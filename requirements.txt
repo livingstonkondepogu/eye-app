@@ -1,6 +1,6 @@
-streamlit==1.30.0
-opencv-python
+streamlit==1.26.0  # or higher if compatible with protobuf>=5
 tensorflow==2.20.0
+opencv-python
 numpy
 pillow
 matplotlib
